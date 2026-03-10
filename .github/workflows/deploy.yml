@@ -5,9 +5,8 @@ on:
     branches: [main]
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,21 +21,24 @@ jobs:
       - name: Build JAR
         run: mvn package -DskipTests
 
-      - name: Deploy to Raspberry Pi
-        env:
-          PI_HOST: ${{ secrets.PI_HOST }}
-          PI_USER: ${{ secrets.PI_USER }}
-          PI_SSH_KEY: ${{ secrets.PI_SSH_KEY }}
+      - name: Upload JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: dailydev-jar
+          path: target/dailydev-1.0.0.jar
+          retention-days: 1
+
+  deploy:
+    runs-on: self-hosted
+    needs: build
+    steps:
+      - name: Download JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: dailydev-jar
+
+      - name: Deploy
         run: |
-          echo "$PI_SSH_KEY" > /tmp/pi_key
-          chmod 600 /tmp/pi_key
-
-          scp -i /tmp/pi_key \
-              -o StrictHostKeyChecking=no \
-              target/dailydev-1.0.0.jar \
-              $PI_USER@$PI_HOST:/opt/dailydev/dailydev-1.0.0.jar
-
-          ssh -i /tmp/pi_key \
-              -o StrictHostKeyChecking=no \
-              $PI_USER@$PI_HOST \
-              "sudo systemctl restart dailydev && sudo systemctl status dailydev --no-pager"
+          cp dailydev-1.0.0.jar /opt/dailydev/dailydev-1.0.0.jar
+          sudo systemctl restart dailydev
+          sudo systemctl status dailydev --no-pager
