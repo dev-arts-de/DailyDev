@@ -53,6 +53,7 @@ public class GitService {
     private void cloneRepo(File repoDir) throws Exception {
         log.info("Cloning repository to {}", localPath);
         runGit(null, "clone", getAuthenticatedUrl(), repoDir.getAbsolutePath());
+        runGit(repoDir, "remote", "set-url", "origin", getAuthenticatedUrl());
         configureUser(repoDir);
     }
 
@@ -67,7 +68,7 @@ public class GitService {
     }
 
     private String getAuthenticatedUrl() {
-        return repoUrl.replace("https://", "https://" + token + "@");
+        return repoUrl.replace("https://", "https://x-access-token:" + token + "@");
     }
 
     private void runGit(File workingDir, String... args) throws Exception {

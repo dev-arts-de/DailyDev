@@ -19,8 +19,7 @@ spring:
 
 dailyDev:
   task:
-    initialDelay: 10000     # 10 Sekunden nach Start
-    fixedDelay: 86400000    # danach alle 24 Stunden
+    cron: "0 0 10,16,20 * * *"  # täglich um 10, 16 und 20 Uhr
   anthropic:
     apiKey: ${ANTHROPIC_API_KEY}
   git:

@@ -3,6 +3,7 @@ package de.shopitech.service;
 import com.anthropic.client.AnthropicClient;
 import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import com.anthropic.models.messages.MessageCreateParams;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -13,29 +14,55 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AnthropicService {
 
+    private static final int MAX_RETRIES = 2;
+
     @Value("${dailyDev.anthropic.apiKey}")
     private String apiKey;
 
-    public String generateMarkdownContent(String topicName, String category) {
-        AnthropicClient client = AnthropicOkHttpClient.builder()
+    private AnthropicClient client;
+
+    @PostConstruct
+    public void init() {
+        client = AnthropicOkHttpClient.builder()
                 .apiKey(apiKey)
                 .build();
+    }
 
-        var message = client.messages().create(
-                MessageCreateParams.builder()
-                        .model("claude-haiku-4-5-20251001")
-                        .maxTokens(2048)
-                        .addUserMessage(buildPrompt(topicName, category))
-                        .build()
-        );
+    public String generateMarkdownContent(String topicName, String category) {
+        Exception lastException = null;
 
-        String content = message.content().stream()
-                .filter(b -> b.text().isPresent())
-                .map(b -> b.text().get().text())
-                .collect(Collectors.joining());
+        for (int attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
+            try {
+                var message = client.messages().create(
+                        MessageCreateParams.builder()
+                                .model("claude-haiku-4-5-20251001")
+                                .maxTokens(1400)
+                                .addUserMessage(buildPrompt(topicName, category))
+                                .build()
+                );
 
-        log.debug("Generated content for topic: {}", topicName);
-        return content;
+                String content = message.content().stream()
+                        .filter(b -> b.text().isPresent())
+                        .map(b -> b.text().get().text())
+                        .collect(Collectors.joining());
+
+                log.debug("Generated content for topic: {}", topicName);
+                return content;
+
+            } catch (Exception e) {
+                lastException = e;
+                log.warn("Anthropic attempt {}/{} failed for '{}': {}", attempt, MAX_RETRIES + 1, topicName, e.getMessage());
+                if (attempt <= MAX_RETRIES) {
+                    try {
+                        Thread.sleep(3000L * attempt);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
+        }
+
+        throw new RuntimeException("Anthropic failed after " + (MAX_RETRIES + 1) + " attempts", lastException);
     }
 
     private String buildPrompt(String topicName, String category) {

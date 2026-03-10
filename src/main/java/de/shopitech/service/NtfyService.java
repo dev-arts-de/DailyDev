@@ -40,6 +40,19 @@ public class NtfyService {
         log.info("ntfy: review notification sent for {} topics", reviews.size());
     }
 
+    public void sendHealthCheckNotification(long processed, long total) throws Exception {
+        long percent = total > 0 ? (processed * 100 / total) : 0;
+        String body = processed + " von " + total + " Topics verarbeitet (" + percent + "% fertig)";
+        post("DailyDev Status", "low", "white_check_mark", baseUrl, body);
+        log.info("ntfy: health check sent — {}/{}", processed, total);
+    }
+
+    public void sendAllProcessedNotification(long total) throws Exception {
+        String body = "Alle " + total + " Topics wurden verarbeitet. Die Wissensdatenbank ist vollstandig!";
+        post("DailyDev abgeschlossen", "high", "tada,books", baseUrl, body);
+        log.info("ntfy: all-processed notification sent — {} topics total", total);
+    }
+
     private void post(String title, String priority, String tags, String clickUrl, String body) throws Exception {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl + "/" + topic))

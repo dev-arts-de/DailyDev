@@ -1,0 +1,18 @@
+[Unit]
+Description=DailyDev Spring Boot Application
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=iqwrwq
+WorkingDirectory=/opt/dailydev
+EnvironmentFile=/opt/dailydev/.env
+ExecStart=/usr/bin/java -jar /opt/dailydev/dailydev-1.0.0.jar
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/opt/dailydev/app.log
+StandardError=append:/opt/dailydev/app.log
+
+[Install]
+WantedBy=multi-user.target

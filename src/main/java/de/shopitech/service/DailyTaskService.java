@@ -34,7 +34,13 @@ public class DailyTaskService {
 
         TaskEntity task = taskRepository.findRandomUnprocessed().orElse(null);
         if (task == null) {
+            long total = taskRepository.count();
             log.info("All tasks processed — nothing to do.");
+            try {
+                ntfyService.sendAllProcessedNotification(total);
+            } catch (Exception e) {
+                log.error("Failed to send all-processed notification: {}", e.getMessage(), e);
+            }
             return;
         }
 
@@ -53,6 +59,10 @@ public class DailyTaskService {
 
             ntfyService.sendNewTopicNotification(task.getName(), vercelUrl);
             log.info("Task done: {} -> {}", task.getSlug(), vercelUrl);
+
+            long processed = taskRepository.countByProcessedTrue();
+            long total = taskRepository.count();
+            ntfyService.sendHealthCheckNotification(processed, total);
 
             sendReviewsIfEligible(task);
 
@@ -104,6 +114,28 @@ public class DailyTaskService {
         return result;
     }
 
+    private String escapeVueTemplateSyntax(String content) {
+        StringBuilder result = new StringBuilder();
+        String[] lines = content.split("\n", -1);
+        boolean inCodeBlock = false;
+
+        for (String line : lines) {
+            if (line.startsWith("```")) {
+                inCodeBlock = !inCodeBlock;
+            }
+            if (inCodeBlock) {
+                result.append(line);
+            } else {
+                result.append(line
+                        .replace("{{", "&#123;&#123;")
+                        .replace("}}", "&#125;&#125;"));
+            }
+            result.append("\n");
+        }
+
+        return result.toString().stripTrailing();
+    }
+
     private String buildMarkdown(String title, LocalDate date, String aiContent) {
         String[] lines = aiContent.split("\n", 3);
         String difficulty = "medium";
@@ -113,6 +145,8 @@ public class DailyTaskService {
             difficulty = lines[0].replace("DIFFICULTY:", "").trim().toLowerCase();
             body = lines.length > 2 ? lines[2] : "";
         }
+
+        body = escapeVueTemplateSyntax(body);
 
         String difficultyLabel = switch (difficulty) {
             case "easy" -> "Einfach";

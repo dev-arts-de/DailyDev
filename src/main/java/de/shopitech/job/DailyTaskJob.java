@@ -13,7 +13,7 @@ public class DailyTaskJob {
 
     private final DailyTaskService dailyTaskService;
 
-    @Scheduled(initialDelayString = "${dailyDev.task.initialDelay}", fixedDelayString = "${dailyDev.task.fixedDelay}")
+    @Scheduled(cron = "${dailyDev.task.cron}")
     private void runDailyTaks() {
         dailyTaskService.executeDailyTask();
     }
